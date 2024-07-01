@@ -1,4 +1,4 @@
-import { FastifyRequest, FastifyReply, DoneFuncWithErrOrRes } from "fastify";
+import { FastifyRequest, FastifyReply } from "fastify";
 import { CREATED, NO_CONTENT, OK } from "../http-code.config";
 
 // Define a symbol metadata key for route information
@@ -41,7 +41,6 @@ export function HTTPRequest(verb: HTTPVerb, path: string, code?: number) {
         descriptor.value = async function (
             request: FastifyRequest,
             reply: FastifyReply,
-            // done: DoneFuncWithErrOrRes
         ) {
             // get transform function from metadata
             const transformFn = Reflect.getOwnMetadata(
@@ -63,6 +62,7 @@ export function HTTPRequest(verb: HTTPVerb, path: string, code?: number) {
                 } catch (error: any) {
                     const statusCode = error?.statusCode || 500
                     const message = error?.message || 'Internal Server Error'
+
                     reply.status(statusCode).send({
                         code: statusCode,
                         message,

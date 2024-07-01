@@ -1,13 +1,15 @@
 import { Controller } from "../configs/decorators/app-registry.decorator";
 import { Get } from "../configs/decorators/http-request.decorator";
+import { AppService } from "./app.service";
 
 @Controller()
 export class AppController {
-    constructor() {}
+    constructor(
+        private readonly appService: AppService
+    ) {}
     
     @Get("/")
     public healthz() {
-        throw new Error('Error 555')
-        return "Hello World"
+        return this.appService.find()
     }
 }

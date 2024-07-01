@@ -1,7 +1,14 @@
+import cors from "@fastify/cors"
+import helmet from "@fastify/helmet"
 import Fastify, { FastifyInstance } from 'fastify'
-import { container, singleton } from "tsyringe";
+import { container, inject, singleton } from "tsyringe";
 import { CONTROLLER_ROUTE_PATH, CONTROLLER_ENTITIES } from './configs/decorators/app-registry.decorator';
 import { ControllerRoute, HTTP_ROUTE_INFO } from './configs/decorators/http-request.decorator';
+import { DataSource } from 'typeorm';
+import RequestHook from "./configs/middlewares/request.middleware";
+import FinishedHook from "./configs/middlewares/finished.middleware";
+import { Logger } from "./configs/logger.config";
+
 
 @singleton()
 export class AppServer {
@@ -11,15 +18,33 @@ export class AppServer {
 
     private controllers: unknown[] = [];
 
-    constructor() {
+    constructor(@inject("DataSource") private datasource: DataSource) {
         this.server = Fastify()
     }
 
-    public InitializeAppServer(controllers: unknown[]) {
+    public async InitializeAppServer(controllers: unknown[]) {
         // define consumable controllers
         this.controllers = controllers;
 
-        return this.registerControllers()
+        try {
+            await this.datasource.initialize();
+            Logger.Success("Intialize Database Successful");
+
+            return this.pluginMiddlewares();
+        } catch (error) {
+            Logger.Error(JSON.stringify(error));
+            process.exit(1);
+        }
+    }
+
+    private pluginMiddlewares() {
+        this.server.register(cors)
+        this.server.register(helmet)
+        this.server.addHook('onRequest', RequestHook)
+        this.server.addHook('onSend', FinishedHook);
+        // this.server.use(AuthParser)
+
+        return this.registerControllers();
     }
 
     private registerControllers() {
@@ -33,26 +58,26 @@ export class AppServer {
                 controller
             );
 
-            // const entities = Reflect.getMetadata(
-            //     CONTROLLER_ENTITIES,
-            //     controller
-            // );
+            const entities = Reflect.getMetadata(
+                CONTROLLER_ENTITIES,
+                controller
+            );
 
             // register all entity repositories
-            // if (entities?.length > 0) {
-            //     entities.forEach((entity: any) => {
-            //         try {
-            //             // check entity was registered or not?
-            //             container.resolve(`${entity.name}Repository`);
-            //         } catch (error) {
-            //             // if not, register a new one
-            //             container.register(`${entity.name}Repository`, {
-            //                 useFactory: () =>
-            //                     this.datasource.getRepository(entity),
-            //             });
-            //         }
-            //     });
-            // }
+            if (entities?.length > 0) {
+                entities.forEach((entity: any) => {
+                    try {
+                        // check entity was registered or not?
+                        container.resolve(`${entity.name}Repository`);
+                    } catch (error) {
+                        // if not, register a new one
+                        container.register(`${entity.name}Repository`, {
+                            useFactory: () =>
+                                this.datasource.getRepository(entity),
+                        });
+                    }
+                });
+            }
 
             // Register routes
             const instance: any = container.resolve(controller);
@@ -91,10 +116,10 @@ export class AppServer {
     private start(): void {
         this.server.listen({ port: this.PORT }, (err, address) => {
             if (err) {
-              console.error(err)
-              process.exit(1)
+                console.error(err)
+                process.exit(1)
             }
             console.log(`Server listening at ${address.replace('[::1]', '127.0.0.1')}`)
-          })
+        })
     }
 }
