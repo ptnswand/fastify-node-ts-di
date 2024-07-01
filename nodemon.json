@@ -1,0 +1,14 @@
+{
+    "restartable": "rs",
+    "ignore": [
+        "build/",
+        "node_modules/"
+    ],
+    "delay": "1000",
+    "verbose": true,
+    "watch": [
+        "src/"
+    ],
+    "exec": "ts-node ./src/app.init.ts",
+    "ext": ".ts"
+}

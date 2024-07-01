@@ -1,0 +1,8 @@
+/node_modules
+
+# environment
+.env
+
+# lock file
+npm-lock.json
+yarn.lock
