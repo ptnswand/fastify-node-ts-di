@@ -1,6 +1,4 @@
-import { container, inject, injectable, singleton } from "tsyringe";
-import { HttpError } from "../error.config";
-import { DataSource } from "typeorm";
+import { inject, injectable, singleton } from "tsyringe";
 
 // Define a symbol metadata key for register controller's path 
 export const CONTROLLER_ROUTE_PATH = Symbol("controller:path");

@@ -27,5 +27,19 @@
     "reflect-metadata": "^0.2.2",
     "ts-node": "^10.9.2",
     "typescript": "^5.5.2"
+  },
+  "nodemonConfig": {
+    "restartable": "rs",
+    "ignore": [
+      "build/",
+      "node_modules/"
+    ],
+    "delay": "1000",
+    "verbose": true,
+    "watch": [
+      "src/"
+    ],
+    "exec": "ts-node ./src/app.init.ts",
+    "ext": ".ts"
   }
 }
