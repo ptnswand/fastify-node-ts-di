@@ -2,7 +2,7 @@ import cors from "@fastify/cors"
 import helmet from "@fastify/helmet"
 import Fastify, { FastifyInstance } from 'fastify'
 import { container, inject, singleton } from "tsyringe";
-import { CONTROLLER_ROUTE_PATH, CONTROLLER_REPOSITORIES } from './configs/decorators/app-registry.decorator';
+import { CONTROLLER_ROUTE_PATH, CONTROLLER_REPOSITORIES, CONTROLLER_ENTITIES } from './configs/decorators/app-registry.decorator';
 import { ControllerRoute, HTTP_ROUTE_PATH } from './configs/decorators/http-request.decorator';
 import { DataSource } from 'typeorm';
 import RequestHook from "./configs/middlewares/request.middleware";
@@ -62,11 +62,16 @@ export class AppServer {
                 controller
             );
 
-            // register all repositories
-            if (repositories?.length > 0) {
-                repositories.forEach(async ({ repo, entity }: any) => {
+            const entities = Reflect.getMetadata(
+                CONTROLLER_ENTITIES,
+                controller
+            )
 
-                    // register Entity Repository if not registered
+            // register all repositories
+            if (repositories?.length) {
+                repositories.forEach(({ repo, entity }: any) => {
+
+                    // register Repository if not registered
                     if (!container.isRegistered(repo.name)) {
                         const repoMethods = this.extractRepositoryMethods(repo, entity)
 
@@ -75,6 +80,19 @@ export class AppServer {
                         });
                     }
                 });
+            }
+
+            // register all entities
+            if (entities?.length) {
+                entities.forEach((entity: any) => {
+
+                    // register Entity if not registered
+                    if (!container.isRegistered(entity.name)) {
+                        container.register(entity.name, {
+                            useValue: this.datasource.getRepository(entity)
+                        })
+                    }
+                })
             }
 
             // Register routes

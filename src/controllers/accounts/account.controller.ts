@@ -8,6 +8,11 @@ export class AccountController {
     constructor(private readonly accountService: AccountService) {}
     
     @Get('/')
+    getAllAccount() {
+        return this.accountService.findAll()
+    }
+    
+    @Get('/Search')
     getAccount(req: FastifyRequest) {
         const { name } = req.query as any
         return this.accountService.findByName(name || '')

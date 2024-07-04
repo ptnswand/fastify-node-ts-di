@@ -3,8 +3,11 @@ import { inject, injectable, singleton } from "tsyringe";
 // Define a symbol metadata key for register controller's path 
 export const CONTROLLER_ROUTE_PATH = Symbol("controller:path");
 
-// Define a symbol metadata key for register controller's entities 
+// Define a symbol metadata key for register controller's repositories 
 export const CONTROLLER_REPOSITORIES = Symbol("controller:repositories");
+
+// Define a symbol metadata key for register controller's entities
+export const CONTROLLER_ENTITIES = Symbol("controller:entities")
 
 // Define a symbol metadata key for register service's repositories 
 export const SERVICE_REPOSITORIES = Symbol("service:repositories");
@@ -31,8 +34,9 @@ export function Controller(path?: string): ClassDecorator {
         metadataKeys.forEach((key: string) => {
             if (key === "design:paramtypes") {
                 const services = Reflect.getMetadata(key, target);
-
+                
                 if (services?.length > 0) {
+                    const controllerRepositories: any = [];
                     const controllerEntities: any = [];
 
                     services.forEach((service: any) => {
@@ -42,15 +46,33 @@ export function Controller(path?: string): ClassDecorator {
                             service
                         );
 
+                        // set repositories from service if exists
+                        if (repositories?.length) {
+                            controllerRepositories.push(...repositories);
+                        }
+
+                        // get injected entities each service
+                        const entities = Reflect.getMetadata(
+                            SERVICE_ENTITIES,
+                            service
+                        )
+
                         // set entities from service if exists
-                        if (repositories) {
-                            controllerEntities.push(...repositories);
+                        if (entities?.length) {
+                            controllerEntities.push(...entities);
                         }
                     });
 
-                    // set controller entities to metadata key
+                    // set controller repositories to metadata key
                     Reflect.defineMetadata(
                         CONTROLLER_REPOSITORIES,
+                        controllerRepositories,
+                        target
+                    );
+
+                    // set controller entities to metadata key
+                    Reflect.defineMetadata(
+                        CONTROLLER_ENTITIES,
                         controllerEntities,
                         target
                     );
@@ -94,4 +116,18 @@ export function InjectRepository(repo: Function): ParameterDecorator {
 
         inject(repo.name)(target, propertyKey, parameterIndex);
     };
+}
+
+export function InjectEntityRepo(entity: any): ParameterDecorator {
+    return function (target: Object, propertyKey: string | symbol | undefined, parameterIndex: number) {
+        let entities = Reflect.getMetadata(
+            SERVICE_ENTITIES,
+            target
+        )
+
+        entities = entities ? [...entities, entity] : [entity]
+        Reflect.defineMetadata(SERVICE_ENTITIES, entities, target)
+        
+        inject(entity.name)(target, propertyKey, parameterIndex)
+    }
 }
