@@ -1,16 +1,21 @@
-import { injectable, singleton } from "tsyringe";
+import { container, inject, injectable, singleton } from "tsyringe";
+import { HttpError } from "../error.config";
+import { DataSource } from "typeorm";
 
 // Define a symbol metadata key for register controller's path 
-export const CONTROLLER_ROUTE_PATH = Symbol("controller-path");
+export const CONTROLLER_ROUTE_PATH = Symbol("controller:path");
 
 // Define a symbol metadata key for register controller's entities 
-export const CONTROLLER_ENTITIES = Symbol("controller-entities");
+export const CONTROLLER_REPOSITORIES = Symbol("controller:repositories");
+
+// Define a symbol metadata key for register service's repositories 
+export const SERVICE_REPOSITORIES = Symbol("service:repositories");
 
 // Define a symbol metadata key for register service's entities 
-export const SERVICE_ENTITIES = Symbol("service-entities");
+export const SERVICE_ENTITIES = Symbol("service:entities");
 
 /**
- * determine a app's controller
+ * determine a app's Controller decorator
  * 
  * @param path controller's route path
  */
@@ -33,20 +38,21 @@ export function Controller(path?: string): ClassDecorator {
                     const controllerEntities: any = [];
 
                     services.forEach((service: any) => {
-                        // container.register(s, { useClass: s });
-                        const entities = Reflect.getMetadata(
-                            SERVICE_ENTITIES,
+                        // get injected repositories each service
+                        const repositories = Reflect.getMetadata(
+                            SERVICE_REPOSITORIES,
                             service
                         );
+
                         // set entities from service if exists
-                        if (entities) {
-                            controllerEntities.push(...entities);
+                        if (repositories) {
+                            controllerEntities.push(...repositories);
                         }
                     });
 
                     // set controller entities to metadata key
                     Reflect.defineMetadata(
-                        CONTROLLER_ENTITIES,
+                        CONTROLLER_REPOSITORIES,
                         controllerEntities,
                         target
                     );
@@ -57,17 +63,37 @@ export function Controller(path?: string): ClassDecorator {
 }
 
 /**
- * determine a controller's service
- * 
- * @param entities register entities when using repository
+ * determine a Service decorator 
  */
-export function Service(entities?: any[]): ClassDecorator {
-    return (target: any) => {
+export function Service(): ClassDecorator {
+    return function (target: any) {
         injectable()(target); // Make the class injectable
+    };
+}
 
-        if (entities) {
-            // set service entities to metadata key
-            Reflect.defineMetadata(SERVICE_ENTITIES, entities, target);
-        }
+// Define a Custom Repository class decorator
+export function CustomRepository(entity: any): ClassDecorator {
+    return function (target: any) {
+        Reflect.defineMetadata(SERVICE_ENTITIES, entity, target);
+    }
+}
+
+// Define a custom Inject Repository for parameter decorator
+export function InjectRepository(repo: Function): ParameterDecorator {
+    return function (target: Object, propertyKey: string | symbol | undefined, parameterIndex: number) {
+        let repositories = Reflect.getMetadata(
+            SERVICE_REPOSITORIES,
+            target
+        );
+
+        const entity = Reflect.getMetadata(
+            SERVICE_ENTITIES,
+            repo
+        )
+
+        repositories = repositories ? [...repositories, { repo, entity }] : [{ repo, entity }]
+        Reflect.defineMetadata(SERVICE_REPOSITORIES, repositories, target);
+
+        inject(repo.name)(target, propertyKey, parameterIndex);
     };
 }

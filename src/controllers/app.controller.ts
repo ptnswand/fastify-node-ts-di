@@ -1,3 +1,4 @@
+import { FastifyRequest } from "fastify";
 import { Controller } from "../configs/decorators/app-registry.decorator";
 import { Get } from "../configs/decorators/http-request.decorator";
 import { AppService } from "./app.service";
@@ -9,7 +10,7 @@ export class AppController {
     ) {}
     
     @Get("/")
-    public healthz() {
-        return this.appService.find()
+    healthz() {
+        return this.appService.greeting()
     }
 }

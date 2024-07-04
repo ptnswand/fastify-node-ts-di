@@ -2,10 +2,10 @@ import { FastifyRequest, FastifyReply } from "fastify";
 import { CREATED, NO_CONTENT, OK } from "../http-code.config";
 
 // Define a symbol metadata key for route information
-export const HTTP_ROUTE_INFO = Symbol("routes");
+export const HTTP_ROUTE_PATH = Symbol("http:routes");
 
 // Define a symbol metadata key for request transformer
-export const REQUEST_TRANSFORMER = Symbol("transform")
+export const REQUEST_TRANSFORMER = Symbol("request:transform")
 
 type HTTPVerb = "get" | "post" | "patch" | "delete";
 
@@ -31,7 +31,7 @@ export function HTTPRequest(verb: HTTPVerb, path: string, code?: number) {
             name: propertyKey,
         };
 
-        Reflect.defineMetadata(HTTP_ROUTE_INFO, route, target, propertyKey);
+        Reflect.defineMetadata(HTTP_ROUTE_PATH, route, target, propertyKey);
 
         /**
          * Apply transformations for request data transfer to object

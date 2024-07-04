@@ -2,13 +2,12 @@ import cors from "@fastify/cors"
 import helmet from "@fastify/helmet"
 import Fastify, { FastifyInstance } from 'fastify'
 import { container, inject, singleton } from "tsyringe";
-import { CONTROLLER_ROUTE_PATH, CONTROLLER_ENTITIES } from './configs/decorators/app-registry.decorator';
-import { ControllerRoute, HTTP_ROUTE_INFO } from './configs/decorators/http-request.decorator';
+import { CONTROLLER_ROUTE_PATH, CONTROLLER_REPOSITORIES } from './configs/decorators/app-registry.decorator';
+import { ControllerRoute, HTTP_ROUTE_PATH } from './configs/decorators/http-request.decorator';
 import { DataSource } from 'typeorm';
 import RequestHook from "./configs/middlewares/request.middleware";
 import FinishedHook from "./configs/middlewares/finished.middleware";
 import { Logger } from "./configs/logger.config";
-
 
 @singleton()
 export class AppServer {
@@ -58,22 +57,21 @@ export class AppServer {
                 controller
             );
 
-            const entities = Reflect.getMetadata(
-                CONTROLLER_ENTITIES,
+            const repositories = Reflect.getMetadata(
+                CONTROLLER_REPOSITORIES,
                 controller
             );
 
-            // register all entity repositories
-            if (entities?.length > 0) {
-                entities.forEach((entity: any) => {
-                    try {
-                        // check entity was registered or not?
-                        container.resolve(`${entity.name}Repository`);
-                    } catch (error) {
-                        // if not, register a new one
-                        container.register(`${entity.name}Repository`, {
-                            useFactory: () =>
-                                this.datasource.getRepository(entity),
+            // register all repositories
+            if (repositories?.length > 0) {
+                repositories.forEach(async ({ repo, entity }: any) => {
+
+                    // register Entity Repository if not registered
+                    if (!container.isRegistered(repo.name)) {
+                        const repoMethods = this.extractRepositoryMethods(repo, entity)
+
+                        container.register(repo.name, {
+                            useValue: this.datasource.getRepository(entity).extend(repoMethods),
                         });
                     }
                 });
@@ -85,7 +83,7 @@ export class AppServer {
 
             Object.getOwnPropertyNames(prototype).forEach((methodName) => {
                 const route: ControllerRoute = Reflect.getMetadata(
-                    HTTP_ROUTE_INFO,
+                    HTTP_ROUTE_PATH,
                     prototype,
                     methodName
                 );
@@ -111,6 +109,18 @@ export class AppServer {
         });
 
         return this.start();
+    }
+
+    private extractRepositoryMethods(repo: any, entity: any) {
+        const methods = Object.getOwnPropertyNames(repo.prototype).filter(
+            methodName => methodName !== 'constructor'
+        );
+
+        return methods.reduce((obj, methodName) => {
+            obj[methodName] = repo.prototype[methodName]
+                .bind(this.datasource.getRepository(entity));
+            return obj;
+        }, {} as any);
     }
 
     private start(): void {
