@@ -1,5 +1,7 @@
 import { FastifyRequest, FastifyReply } from "fastify";
-import { CREATED, NO_CONTENT, OK } from "../http-code.config";
+import { BAD_REQUEST, CREATED, NO_CONTENT, OK } from "../http-code.config";
+import { plainToInstance } from "class-transformer";
+import { validateOrReject } from "class-validator";
 
 // Define a symbol metadata key for route information
 export const HTTP_ROUTE_PATH = Symbol("http:routes");
@@ -43,15 +45,40 @@ export function HTTPRequest(verb: HTTPVerb, path: string, code?: number) {
             reply: FastifyReply,
         ) {
             // get transform function from metadata
-            const transformFn = Reflect.getOwnMetadata(
+            const classDTO = Reflect.getOwnMetadata(
                 REQUEST_TRANSFORMER,
                 target,
                 propertyKey // property name
             );
 
-            // transform request if fn exists
-            if (transformFn) {
-                request = transformFn(request);
+            // validate request if specific
+            if (classDTO) {
+                // Transform plain object to class instance
+                const dto: any = plainToInstance(classDTO, {
+                    ...(request?.params || {}),
+                    ...(request?.query || {}),
+                    ...(request?.body || {}),
+                });
+                
+                try {
+                    // Validate the class instance
+                    await validateOrReject(dto);
+                    request = dto
+                } catch (errors: any) {
+                    request = errors
+                    
+                    let message = 'Bad Request'
+
+                    if (errors?.length) {
+                        const constraint = Object.values(errors[0]?.constraints).pop()
+                        message = `Property ${constraint}`
+                    }
+
+                    reply.status(BAD_REQUEST).send({
+                        code: BAD_REQUEST,
+                        message,
+                    });
+                }
             }
 
             // apply transformed request
@@ -177,10 +204,10 @@ export function Delete(path: string, code: number | 'RES' = NO_CONTENT) {
  * Define a decorator factory function for data transfer object (DTO)
  * @param fn transform & validate request function
  */
-export function DTO<T = any>(fn: (request: Request) => T): ParameterDecorator {
+export function ValidateReq<T = any>(classDTO: T): ParameterDecorator {
     return (target: any, propertyKey: string | symbol | undefined) => {
         if (!propertyKey) return;
 
-        Reflect.defineMetadata(REQUEST_TRANSFORMER, fn, target, propertyKey);
+        Reflect.defineMetadata(REQUEST_TRANSFORMER, classDTO, target, propertyKey);
     };
 }
